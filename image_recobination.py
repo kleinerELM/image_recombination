@@ -1,3 +1,4 @@
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 import csv
 import os, sys, getopt, platform, subprocess
@@ -5,128 +6,208 @@ import tkinter as tk
 from tkinter import filedialog
 from PIL import Image
 import numpy as np
-#remove root windows
-root = tk.Tk()
-root.withdraw()
 
-print("#########################################################")
-print("# Automatically stitch TIFF images using a defined grid #")
-print("# in a selected folder.                                 #")
-print("#                                                       #")
-print("# © 2020 Florian Kleiner, Max Patzelt                   #")
-print("#   Bauhaus-Universität Weimar                          #")
-print("#   Finger-Institut für Baustoffkunde                   #")
-print("#                                                       #")
-print("#########################################################")
-print()
+home_dir = os.path.dirname(os.path.realpath(__file__))
+# import tiff_scaling script
+sys.path.insert(1, os.path.dirname( home_dir ) + '/tiff_scaling/')
+import set_tiff_scaling
 
-#### directory definitions
-home_dir = os.path.dirname( os.path.realpath(__file__) )
+def programInfo():
+    print("#########################################################")
+    print("# Automatically stitch TIFF images using a defined grid #")
+    print("# in a selected folder.                                 #")
+    print("#                                                       #")
+    print("# © 2020 Florian Kleiner, Max Patzelt                   #")
+    print("#   Bauhaus-Universität Weimar                          #")
+    print("#   Finger-Institut für Baustoffkunde                   #")
+    print("#                                                       #")
+    print("#########################################################", end='\n\n')
 
-#### global var definitions
-col_count = 2
-row_count = 2
-showDebuggingOutput = False
-openResultFile = False
+def getBaseSettings():
+    settings = {
+        "showDebuggingOutput" : False,
+        "openResultFile"      : False,
+        "createThumbnail"     : False,
+        "home_dir"            : os.path.dirname(os.path.realpath(__file__)),
+        "workingDirectory"    : "",
+        "outputDirectory"     : "",
+        "fileType"            : "",
+        "col_count"           : 2,
+        "row_count"           : 2,
+        "tile_count"          : 0,
+        "imageDirection"      : "h",
+        "scaleFactor"         : 1,
+        "scaleX"              : 1,
+        "scaleY"              : 1,
+        "scaleUnit"           : 'nm'
+    }
+    return settings
 
 #### process given command line arguments
 def processArguments():
-    global col_count
-    global row_count
-    global showDebuggingOutput
-    global openResultFile
-    argv = sys.argv[1:]
-    usage = sys.argv[0] + " [-h] [-x] [-y] [-d]"
+    settings = getBaseSettings()
     col_changed = False
     row_changed = False
+    argv = sys.argv[1:]
+    usage = sys.argv[0] + " [-h] [-x] [-y] [-d]"
     try:
-        opts, args = getopt.getopt(argv,"hcx:y:d",[])
+        opts, args = getopt.getopt(argv,"hw:x:y:s:vtod",[])
     except getopt.GetoptError:
         print( usage )
     for opt, arg in opts:
         if opt == '-h':
             print( 'usage: ' + usage )
             print( '-h,                  : show this help' )
-            print( '-x,                  : amount of slices in x direction [' + str( col_count ) + ']' )
-            print( '-y,                  : amount of slices in y direction [' + str( row_count ) + ']' )
+            print( '-w,                  : directory containing the images [' + settings["workingDirectory"] + ']' )
+            print( '-x,                  : amount of slices in x direction [' + str( settings["col_count"] ) + ']' )
+            print( '-y,                  : amount of slices in y direction [' + str( settings["row_count"] ) + ']' )
+            print( '-s,                  : scaling factor [' + str( settings["scaleFactor"] ) + ']' )
+            print( '-v,                  : change direction of the first line of tiles to vertical' )
+            print( '-t,                  : create a thumbnail' )
             print( '-o,                  : open result file' )
             print( '-d                   : show debug output' )
             print( '' )
             sys.exit()
-        elif opt in ("-o"):
-            openResultFile = True
-            print( 'result file will be opened' )
+        elif opt in ("-w"):
+            newWorkingDirectory = str( arg )
+            if ( os.path.isdir( newWorkingDirectory ) ):
+                settings["workingDirectory"] = str( arg )
+                print( 'changed working directory to "' + settings["workingDirectory"] + '"' )
+            else:
+                print( '"' + settings["workingDirectory"] + '" is not a directory!' )
         elif opt in ("-x"):
-            col_count = int( arg )
+            settings["col_count"] = int( arg )
             col_changed = True
-            print( 'changed amount of slices in x direction to ' + str( col_count ) )
+            print( 'changed amount of slices in x direction to ' + str( settings["col_count"] ) )
         elif opt in ("-y"):
-            row_count = int( arg )
+            settings["row_count"] = int( arg )
             row_changed = True
-            print( 'changed amount of slices in y direction to ' + str( row_count ) )
+            print( 'changed amount of slices in y direction to ' + str( settings["row_count"] ) )
+        elif opt in ("-s"):
+            settings["scaleFactor"] = int( arg )
+            print( 'changed scale factor to ' + str( settings["scaleFactor"] ) )
+        elif opt in ("-t"):
+            settings["createThumbnail"] = True
+            print( 'creating thumbnail' )
+        elif opt in ("-o"):
+            settings["openResultFile"] = True
+            print( 'result file will be opened' )
+        elif opt in ("-v"):
+            settings["imageDirection"] = 'v'
+            print( 'result file will be opened' )
         elif opt in ("-d"):
             print( 'show debugging output' )
-            showDebuggingOutput = True
-    # alway expecting the same values for row/col if not defined explicitly        
+            settings["showDebuggingOutput"] = True
+    # always expecting the same values for row/col if not defined explicitly
     if col_changed and not row_changed:
-        row_count = col_count
-        print( 'changed amount of slices in y direction also to ' + str( row_count ) )
+        settings["row_count"] = settings["col_count"]
+        print( 'changed amount of slices in y direction also to ' + str( settings["row_count"] ) )
     elif row_changed and not col_changed:
-        col_count = row_count
-        print( 'changed amount of slices in x direction also to ' + str( col_count ) )
+        settings["col_count"] = settings["row_count"]
+        print( 'changed amount of slices in x direction also to ' + str( settings["col_count"] ) )
+    imageDirectionName = 'vertical' if ( settings["imageDirection"] == 'v' ) else 'horizontal'
+    print( 'direction of the first line of tiles is ' + imageDirectionName )
     print( '' )
+    return settings
 
-def pil_grid(images, max_horiz=np.iinfo(int).max, fileType="png"):
-    global workingDirectory
-    n_images = len(images)
-    n_horiz = min(n_images, max_horiz)
-    h_sizes, v_sizes = [0] * n_horiz, [0] * (n_images // n_horiz)
-    for i, im in enumerate(images):
-        h, v = i % n_horiz, i // n_horiz
-        h_sizes[h] = max(h_sizes[h], im.size[0])
-        v_sizes[v] = max(v_sizes[v], im.size[1])
-    h_sizes, v_sizes = np.cumsum([0] + h_sizes), np.cumsum([0] + v_sizes)
-    im_grid = Image.new('RGB', (h_sizes[-1], v_sizes[-1]), color='white')
-    for i, im in enumerate(images):
-        print( " " + str( i+1 ), end="\r" )
-        im_grid.paste(im, (h_sizes[i % n_horiz], v_sizes[i // n_horiz]))
-    resultFile = os.path.dirname(workingDirectory) + '/' + os.path.basename( workingDirectory ) + "." + fileType
-    print( "saving result to " + resultFile )
-    im_grid.save( resultFile )
-    im_grid.close()
-    if openResultFile:
-        if platform.system() == 'Darwin':       # macOS
-            subprocess.call(('open', resultFile))
-        elif platform.system() == 'Windows':    # Windows
-            os.startfile(resultFile)
-        else:                                   # linux variants
-            subprocess.call(('xdg-open', resultFile))
+# https://stackoverflow.com/questions/30227466/combine-several-images-horizontally-with-python
+def stitchImages( settings, fileNameList ):
+    # check, if the image count will fit in new canvas 
+    if ( settings["tile_count"] != settings["col_count"] * settings["row_count"] ):
+        print( "  Error: Expected " + str( settings["col_count"] * settings["row_count"] ) + " images, but found " + str( settings["tile_count"] )  )
+    else:
+        print( "  stitching " + str( settings["tile_count"] ) + " images." )
+        images = [ Image.open( x ) for x in fileNameList ]     
+
+        h_sizes, v_sizes = [0] * settings["col_count"], [0] * settings["row_count"]
+        # get grid size and create empty canvas
+        for i, im in enumerate( images ):
+            print( "   resizing image #" + str( i+1 ), end="     \r" )
+            if ( settings["scaleFactor"] < 1 ):
+                newsize = ( int(im.size[0]*settings["scaleFactor"]), int(im.size[1]*settings["scaleFactor"]) )
+                im = im.resize(newsize) 
+            h, v = i % settings["col_count"], i // settings["col_count"]
+            h_sizes[h] = max(h_sizes[h], im.size[0])
+            v_sizes[v] = max(v_sizes[v], im.size[1])
+        
+        h_sizes, v_sizes = np.cumsum([0] + h_sizes), np.cumsum([0] + v_sizes)
+        im_grid = Image.new('RGB', (h_sizes[-1], v_sizes[-1]), color='white')
+        # insert tiles to canvas
+        for i, im in enumerate( images ):
+            print( "   pasting image #" + str( i+1 ), end="     \r" )
+            if ( settings["imageDirection"] == 'v' ): # vertical tile sequence
+                im_grid.paste(im, (h_sizes[i // settings["row_count"]], v_sizes[i % settings["row_count"]]))
+            else: # horizontal tile sequence
+                im_grid.paste(im, (h_sizes[i % settings["col_count"]], v_sizes[i // settings["col_count"]]))
+        resultFile = settings["outputDirectory"] + '/' + os.path.basename( settings["workingDirectory"] ) + settings["fileType"]
+
+        print( "  saving result to " + resultFile )
+
+        # set scaling for ImageJ
+        scaling = { 'x' : settings["scaleX"], 'y' : settings["scaleY"], 'unit' : settings["scaleUnit"], 'editor':'FEI-MAPS'}
+        im_grid.save( resultFile, tiffinfo = set_tiff_scaling.setImageJScaling( scaling ) )
+
+        thumbXSize = 2000
+        thumbDirectory = settings["outputDirectory"] + '/thumbnails'
+        if ( settings["createThumbnail"] and im_grid.size[0] > thumbXSize):
+            if ( not os.path.isdir( thumbDirectory ) ):
+                os.mkdir( thumbDirectory )
+            thumbFile = thumbDirectory + '/' + os.path.basename( settings["workingDirectory"] ) + settings["fileType"]
+            print( "  saving thumbnail to " + thumbFile )
+            newsize = ( thumbXSize, int(thumbXSize/im_grid.size[0]*im_grid.size[1]) )
+            im_grid = im_grid.resize(newsize) 
+            im_grid.save( thumbFile )
+
+        im_grid.close()
+
+        if settings["openResultFile"]:
+            if platform.system() == 'Darwin':       # macOS
+                subprocess.call(('open', resultFile))
+            elif platform.system() == 'Windows':    # Windows
+                os.startfile(resultFile)
+            else:                                   # linux variants
+                subprocess.call(('xdg-open', resultFile))
+
+def getFileList( settings ):
+    allowed_file_extensions = [ '.tif', '.png' ]
+    if os.path.isdir( settings["workingDirectory"] ) :
+        fileNameList = []
+        for file in os.listdir(settings["workingDirectory"]):
+            file_name, file_extension = os.path.splitext( file )
+            if ( file_extension.lower() in allowed_file_extensions ):#   file.lower().endswith( ".tif" ) or file.lower().endswith( ".png" ) ):
+                if ( settings["fileType"] == "" ):
+                    settings["fileType"] = file_extension.lower()
+                if ( settings["fileType"] == file_extension.lower() ):
+                    settings["tile_count"] += 1
+                    fileNameList.append( settings["workingDirectory"] + "/" + file )
+    else:
+        print( "  Error: '" + settings["workingDirectory"] + "' is no directory")
+    if ( settings["showDebuggingOutput"] ):
+        print( "found " + str( settings["tile_count"] ) + " " + settings["fileType"].upper() + " tiles." )
+
+    return fileNameList
 
 ### actual program start
-processArguments()
-if ( showDebuggingOutput ) : print( "I am living in '" + home_dir + "'" )
-workingDirectory = filedialog.askdirectory(title='Please select the image / working directory')
-if ( showDebuggingOutput ) : print( "Selected working directory: " + workingDirectory )
+if __name__ == '__main__':
+    #remove root windows
+    root = tk.Tk()
+    root.withdraw()
+  
+    ### global settings    
+    programInfo()
+    settings = processArguments()
+    if ( settings["workingDirectory"] == "" ):
+        print( "Please select a working directory", end="\r" )
+        settings["workingDirectory"] = filedialog.askdirectory(title='Please select the image / working directory')
+    if ( settings["outputDirectory"] == "" ):
+        settings["outputDirectory"] = os.path.dirname( settings["workingDirectory"] )
 
-count = 0
-position = 0
-## count files
-if os.path.isdir( workingDirectory ) :
-    fileNameList = []
-    fileType = ''
-    for file in os.listdir(workingDirectory):
-        if ( file.endswith( ".tif" ) or file.endswith( ".TIF" ) or file.endswith( ".png" ) or file.endswith( ".PNG" ) ):
-            count = count + 1
-            if ( file.endswith( ".tif" ) or file.endswith( ".TIF" ) ):
-                fileType = 'tif'
-            if ( file.endswith( ".png" ) or file.endswith( ".PNG" ) ):
-                fileType = 'png'
-            fileNameList.append(file)
-if ( count != col_count * row_count ):
-    print( "Error: Expected" + str( col_count * row_count ) + " images, but found " + str( count )  )
-else:
-    print( str( count ) + " images found as expected!" )
-    images = [Image.open(workingDirectory + "/" + x) for x in fileNameList]        
-    pil_grid( images, col_count, fileType )
+    if ( settings["showDebuggingOutput"] ) : 
+        print( "I am living in '" + settings["home_dir"] + "'" )
+        print( "Selected working directory: " + settings["workingDirectory"] )
+        print( "Output directory: " + settings["outputDirectory"], end='\n\n' )
 
-print( "Script DONE!" )
+    fileNameList = getFileList( settings )
+    stitchImages( settings, fileNameList )
+
+    print( "Script DONE!" )
