@@ -9,6 +9,9 @@ python .\image_recobination.py -x 3 -y 3
 ```
 to stitch 9 images in a 3 x 3 matrix
 
+
+A thumbnail with a x-resolution of 2000 pixel will be saved in a folder called thumbnails in the parent folder.
+
 ## help output
 
 ```
@@ -36,6 +39,6 @@ usage: .\image_recombination.py [-h] [-x] [-y] [-d]
 
 # dependencies
 
-This project depends on another Rpository. 
+This project depends on another Repository. 
 
 https://github.com/kleinerELM/tiff_scaling

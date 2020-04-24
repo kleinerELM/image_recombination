@@ -154,9 +154,11 @@ def stitchImages( settings, fileNameList ):
                 os.mkdir( thumbDirectory )
             thumbFile = thumbDirectory + '/' + os.path.basename( settings["workingDirectory"] ) + settings["fileType"]
             print( "  saving thumbnail to " + thumbFile )
-            newsize = ( thumbXSize, int(thumbXSize/im_grid.size[0]*im_grid.size[1]) )
+            scaleFactor = thumbXSize/im_grid.size[0]
+            newsize = ( thumbXSize, int(scaleFactor*im_grid.size[1]) )
             im_grid = im_grid.resize(newsize) 
-            im_grid.save( thumbFile )
+            scaling = { 'x' : settings["scaleX"]/scaleFactor, 'y' : settings["scaleY"]/scaleFactor , 'unit' : settings["scaleUnit"], 'editor':'FEI-MAPS'}
+            im_grid.save( thumbFile, tiffinfo = set_tiff_scaling.setImageJScaling( scaling ) )
 
         im_grid.close()
 
