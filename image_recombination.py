@@ -7,10 +7,19 @@ from tkinter import filedialog
 from PIL import Image
 import numpy as np
 
+# check for dependencies
 home_dir = os.path.dirname(os.path.realpath(__file__))
 # import tiff_scaling script
-sys.path.insert(1, os.path.dirname( home_dir ) + '/tiff_scaling/')
-import set_tiff_scaling
+ts_path = os.path.dirname( home_dir ) + '/tiff_scaling/'
+ts_file = 'set_tiff_scaling'
+if ( os.path.isdir( ts_path ) and os.path.isfile( ts_path + ts_file + '.py' ) or os.path.isfile( home_dir + ts_file + '.py' ) ):
+    if ( os.path.isdir( ts_path ) ): sys.path.insert( 1, ts_path )
+    import set_tiff_scaling
+else:
+    programInfo()
+    print( 'missing ' + ts_path + ts_file + '.py!' )
+    print( 'download from https://github.com/kleinerELM/tiff_scaling' )
+    sys.exit()
 
 def programInfo():
     print("#########################################################")
