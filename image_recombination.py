@@ -5,6 +5,7 @@ import os, sys, getopt, platform, subprocess
 import tkinter as tk
 from tkinter import filedialog
 from PIL import Image
+Image.MAX_IMAGE_PIXELS = 1000000000 # prevent decompressionbomb warning for typical images
 import numpy as np
 
 # check for dependencies
@@ -14,7 +15,8 @@ ts_path = os.path.dirname( home_dir ) + '/tiff_scaling/'
 ts_file = 'set_tiff_scaling'
 if ( os.path.isdir( ts_path ) and os.path.isfile( ts_path + ts_file + '.py' ) or os.path.isfile( home_dir + ts_file + '.py' ) ):
     if ( os.path.isdir( ts_path ) ): sys.path.insert( 1, ts_path )
-    import set_tiff_scaling
+    import set_tiff_scaling as ts
+    import extract_tiff_scaling as es
 else:
     programInfo()
     print( 'missing ' + ts_path + ts_file + '.py!' )
@@ -125,6 +127,9 @@ def stitchImages( settings, fileNameList ):
     if ( settings["tile_count"] != settings["col_count"] * settings["row_count"] ):
         print( "  Error: Expected " + str( settings["col_count"] * settings["row_count"] ) + " images, but found " + str( settings["tile_count"] )  )
     else:
+        print(fileNameList[0])
+        scaling = es.autodetectScaling( os.path.basename(fileNameList[0]), settings["workingDirectory"] )
+
         print( "  stitching " + str( settings["tile_count"] ) + " images." )
         images = [ Image.open( x ) for x in fileNameList ]     
 
@@ -148,26 +153,26 @@ def stitchImages( settings, fileNameList ):
                 im_grid.paste(im, (h_sizes[i // settings["row_count"]], v_sizes[i % settings["row_count"]]))
             else: # horizontal tile sequence
                 im_grid.paste(im, (h_sizes[i % settings["col_count"]], v_sizes[i // settings["col_count"]]))
-        resultFile = settings["outputDirectory"] + '/' + os.path.basename( settings["workingDirectory"] ) + settings["fileType"]
+        resultFile = settings["outputDirectory"] + os.sep + os.path.basename( settings["workingDirectory"] ) + settings["fileType"]
 
         print( "  saving result to " + resultFile )
 
         # set scaling for ImageJ
-        scaling = { 'x' : settings["scaleX"], 'y' : settings["scaleY"], 'unit' : settings["scaleUnit"], 'editor':'FEI-MAPS'}
-        im_grid.save( resultFile, tiffinfo = set_tiff_scaling.setImageJScaling( scaling ) )
+        if scaling == False: scaling = { 'x' : settings["scaleX"], 'y' : settings["scaleY"], 'unit' : settings["scaleUnit"], 'editor':'FEI-MAPS'}
+        im_grid.save( resultFile, tiffinfo = ts.setImageJScaling( scaling ) )
 
         thumbXSize = 2000
-        thumbDirectory = settings["outputDirectory"] + '/thumbnails'
+        thumbDirectory = settings["outputDirectory"] + os.sep +'thumbnails'
         if ( settings["createThumbnail"] and im_grid.size[0] > thumbXSize):
             if ( not os.path.isdir( thumbDirectory ) ):
                 os.mkdir( thumbDirectory )
-            thumbFile = thumbDirectory + '/' + os.path.basename( settings["workingDirectory"] ) + settings["fileType"]
+            thumbFile = thumbDirectory + os.sep + os.path.basename( settings["workingDirectory"] ) + settings["fileType"]
             print( "  saving thumbnail to " + thumbFile )
             scaleFactor = thumbXSize/im_grid.size[0]
             newsize = ( thumbXSize, int(scaleFactor*im_grid.size[1]) )
             im_grid = im_grid.resize(newsize) 
-            scaling = { 'x' : settings["scaleX"]/scaleFactor, 'y' : settings["scaleY"]/scaleFactor , 'unit' : settings["scaleUnit"], 'editor':'FEI-MAPS'}
-            im_grid.save( thumbFile, tiffinfo = set_tiff_scaling.setImageJScaling( scaling ) )
+            scaling = { 'x' : scaling['x']/scaleFactor, 'y' : scaling['y']/scaleFactor , 'unit' : scaling['unit'], 'editor' : scaling['editor']}
+            im_grid.save( thumbFile, tiffinfo = ts.setImageJScaling( scaling ) )
 
         im_grid.close()
 
@@ -190,7 +195,7 @@ def getFileList( settings ):
                     settings["fileType"] = file_extension.lower()
                 if ( settings["fileType"] == file_extension.lower() ):
                     settings["tile_count"] += 1
-                    fileNameList.append( settings["workingDirectory"] + "/" + file )
+                    fileNameList.append( settings["workingDirectory"] + os.sep + file )
     else:
         print( "  Error: '" + settings["workingDirectory"] + "' is no directory")
     if ( settings["showDebuggingOutput"] ):
