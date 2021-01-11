@@ -122,14 +122,13 @@ def processArguments():
     return settings
 
 # https://stackoverflow.com/questions/30227466/combine-several-images-horizontally-with-python
-def stitchImages( settings, fileNameList ):
+def stitchImages( settings, fileNameList, resultFile = '', result_file_name = '' ):
     # check, if the image count will fit in new canvas 
     if ( settings["tile_count"] != settings["col_count"] * settings["row_count"] ):
         print( "  Error: Expected " + str( settings["col_count"] * settings["row_count"] ) + " images, but found " + str( settings["tile_count"] )  )
-    else:
-        print(fileNameList[0])
-        scaling = es.autodetectScaling( os.path.basename(fileNameList[0]), settings["workingDirectory"] )
-
+    else:        
+        scaling = es.autodetectScaling( os.path.basename(fileNameList[0]), os.path.dirname(os.path.abspath(fileNameList[0])) )
+        if result_file_name == '': result_file_name = os.path.basename( settings["workingDirectory"] )
         print( "  stitching " + str( settings["tile_count"] ) + " images." )
         images = [ Image.open( x ) for x in fileNameList ]     
 
@@ -139,12 +138,14 @@ def stitchImages( settings, fileNameList ):
             print( "   resizing image #" + str( i+1 ), end="     \r" )
             if ( settings["scaleFactor"] < 1 ):
                 newsize = ( int(im.size[0]*settings["scaleFactor"]), int(im.size[1]*settings["scaleFactor"]) )
-                im = im.resize(newsize) 
+                #print( "   resizing image #" + str( i+1 ), newsize, im.size, int(im.size[0]*settings["scaleFactor"]), end="     \r" )
+                images[i] = images[i].resize(newsize, Image.ANTIALIAS)
             h, v = i % settings["col_count"], i // settings["col_count"]
-            h_sizes[h] = max(h_sizes[h], im.size[0])
-            v_sizes[v] = max(v_sizes[v], im.size[1])
+            h_sizes[h] = max(h_sizes[h], images[i].size[0])
+            v_sizes[v] = max(v_sizes[v], images[i].size[1])
         
         h_sizes, v_sizes = np.cumsum([0] + h_sizes), np.cumsum([0] + v_sizes)
+        #print(h_sizes[-1], v_sizes[-1])
         im_grid = Image.new('RGB', (h_sizes[-1], v_sizes[-1]), color='white')
         # insert tiles to canvas
         for i, im in enumerate( images ):
@@ -153,7 +154,7 @@ def stitchImages( settings, fileNameList ):
                 im_grid.paste(im, (h_sizes[i // settings["row_count"]], v_sizes[i % settings["row_count"]]))
             else: # horizontal tile sequence
                 im_grid.paste(im, (h_sizes[i % settings["col_count"]], v_sizes[i // settings["col_count"]]))
-        resultFile = settings["outputDirectory"] + os.sep + os.path.basename( settings["workingDirectory"] ) + settings["fileType"]
+        if resultFile == '': resultFile = settings["outputDirectory"] + os.sep + result_file_name + settings["fileType"]
 
         print( "  saving result to " + resultFile )
 
@@ -166,7 +167,7 @@ def stitchImages( settings, fileNameList ):
         if ( settings["createThumbnail"] and im_grid.size[0] > thumbXSize):
             if ( not os.path.isdir( thumbDirectory ) ):
                 os.mkdir( thumbDirectory )
-            thumbFile = thumbDirectory + os.sep + os.path.basename( settings["workingDirectory"] ) + settings["fileType"]
+            thumbFile = thumbDirectory + os.sep + result_file_name + settings["fileType"]
             print( "  saving thumbnail to " + thumbFile )
             scaleFactor = thumbXSize/im_grid.size[0]
             newsize = ( thumbXSize, int(scaleFactor*im_grid.size[1]) )
