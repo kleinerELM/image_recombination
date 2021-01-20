@@ -50,7 +50,9 @@ def getBaseSettings():
         "scaleFactor"         : 1,
         "scaleX"              : 1,
         "scaleY"              : 1,
-        "scaleUnit"           : 'nm'
+        "scaleUnit"           : 'nm',
+        "cropX"               : 0,
+        "cropY"               : 0
     }
     return settings
 
@@ -130,7 +132,13 @@ def stitchImages( settings, fileNameList, resultFile = '', result_file_name = ''
         scaling = es.autodetectScaling( os.path.basename(fileNameList[0]), os.path.dirname(os.path.abspath(fileNameList[0])) )
         if result_file_name == '': result_file_name = os.path.basename( settings["workingDirectory"] )
         print( "  stitching " + str( settings["tile_count"] ) + " images." )
-        images = [ Image.open( x ) for x in fileNameList ]     
+        
+        images = []
+        for x in fileNameList:
+            if len(images) > 0 and x == 'EMPTY': # fails if the first image is empty, which should never happen
+                images.append(Image.new(images[0].mode, (images[0].size[0], images[0].size[1]), color='black')) 
+            else:
+                images.append(Image.open( x ))  
 
         h_sizes, v_sizes = [0] * settings["col_count"], [0] * settings["row_count"]
         # get grid size and create empty canvas
@@ -143,10 +151,10 @@ def stitchImages( settings, fileNameList, resultFile = '', result_file_name = ''
             h, v = i % settings["col_count"], i // settings["col_count"]
             h_sizes[h] = max(h_sizes[h], images[i].size[0])
             v_sizes[v] = max(v_sizes[v], images[i].size[1])
-        
+            
         h_sizes, v_sizes = np.cumsum([0] + h_sizes), np.cumsum([0] + v_sizes)
         #print(h_sizes[-1], v_sizes[-1])
-        im_grid = Image.new('RGB', (h_sizes[-1], v_sizes[-1]), color='white')
+        im_grid = Image.new(images[0].mode, (h_sizes[-1], v_sizes[-1]), color='white')
         # insert tiles to canvas
         for i, im in enumerate( images ):
             print( "   pasting image #" + str( i+1 ), end="     \r" )
@@ -157,9 +165,12 @@ def stitchImages( settings, fileNameList, resultFile = '', result_file_name = ''
         if resultFile == '': resultFile = settings["outputDirectory"] + os.sep + result_file_name + settings["fileType"]
 
         print( "  saving result to " + resultFile )
-
+        if settings["cropX"] > 0 and (settings["cropX"] < h_sizes[-1] or settings["cropY"] < v_sizes[-1]):
+            crop_x = settings["cropX"] if settings["cropX"] < h_sizes[-1] else h_sizes[-1]
+            crop_y = settings["cropY"] if settings["cropY"] < v_sizes[-1] else v_sizes[-1]
+            im_grid = im_grid.crop((0,0, crop_x, crop_y))
         # set scaling for ImageJ
-        if scaling == False: scaling = { 'x' : settings["scaleX"], 'y' : settings["scaleY"], 'unit' : settings["scaleUnit"], 'editor':'FEI-MAPS'}
+        if scaling == False or scaling == es.getEmptyScaling(): scaling = { 'x' : settings["scaleX"], 'y' : settings["scaleY"], 'unit' : settings["scaleUnit"], 'editor':'FEI-MAPS'}
         im_grid.save( resultFile, tiffinfo = ts.setImageJScaling( scaling ) )
 
         thumbXSize = 2000
