@@ -146,7 +146,6 @@ def stitchImages( settings, fileNameList, resultFile = '', result_file_name = ''
             print( "   resizing image #" + str( i+1 ), end="     \r" )
             if ( settings["scaleFactor"] < 1 ):
                 newsize = ( int(im.size[0]*settings["scaleFactor"]), int(im.size[1]*settings["scaleFactor"]) )
-                #print( "   resizing image #" + str( i+1 ), newsize, im.size, int(im.size[0]*settings["scaleFactor"]), end="     \r" )
                 images[i] = images[i].resize(newsize, Image.ANTIALIAS)
             h, v = i % settings["col_count"], i // settings["col_count"]
             h_sizes[h] = max(h_sizes[h], images[i].size[0])
@@ -202,7 +201,7 @@ def getFileList( settings ):
         fileNameList = []
         for file in os.listdir(settings["workingDirectory"]):
             file_name, file_extension = os.path.splitext( file )
-            if ( file_extension.lower() in allowed_file_extensions ):#   file.lower().endswith( ".tif" ) or file.lower().endswith( ".png" ) ):
+            if ( file_extension.lower() in allowed_file_extensions ):
                 if ( settings["fileType"] == "" ):
                     settings["fileType"] = file_extension.lower()
                 if ( settings["fileType"] == file_extension.lower() ):
