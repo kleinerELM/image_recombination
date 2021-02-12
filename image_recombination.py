@@ -28,7 +28,7 @@ def programInfo():
     print("# Automatically stitch TIFF images using a defined grid #")
     print("# in a selected folder.                                 #")
     print("#                                                       #")
-    print("# © 2020 Florian Kleiner, Max Patzelt                   #")
+    print("# © 2021 Florian Kleiner, Max Patzelt                   #")
     print("#   Bauhaus-Universität Weimar                          #")
     print("#   Finger-Institut für Baustoffkunde                   #")
     print("#                                                       #")
