@@ -125,75 +125,85 @@ def processArguments():
 
 # https://stackoverflow.com/questions/30227466/combine-several-images-horizontally-with-python
 def stitchImages( settings, fileNameList, resultFile = '', result_file_name = '' ):
-    # check, if the image count will fit in new canvas 
+    # check, if the image count will fit in new canvas
     if ( settings["tile_count"] != settings["col_count"] * settings["row_count"] ):
         print( "  Error: Expected " + str( settings["col_count"] * settings["row_count"] ) + " images, but found " + str( settings["tile_count"] )  )
-    else:        
-        scaling = es.autodetectScaling( os.path.basename(fileNameList[0]), os.path.dirname(os.path.abspath(fileNameList[0])) )
-        if result_file_name == '': result_file_name = os.path.basename( settings["workingDirectory"] )
-        print( "  stitching " + str( settings["tile_count"] ) + " images." )
-        
-        images = []
+    else:
+        scaling_filename = None
         for x in fileNameList:
-            if len(images) > 0 and x == 'EMPTY': # fails if the first image is empty, which should never happen
-                images.append(Image.new(images[0].mode, (images[0].size[0], images[0].size[1]), color='black')) 
-            else:
-                images.append(Image.open( x ))  
+            if x != 'EMPTY': # fails if the first image is empty, which should never happen
+                scaling_filename = x
+                break
+        if scaling_filename != None:
+            scaling = es.autodetectScaling( os.path.basename(scaling_filename), os.path.dirname(os.path.abspath(scaling_filename)) )
+            scaling_file = Image.open( scaling_filename )
+            if result_file_name == '': result_file_name = os.path.basename( settings["workingDirectory"] )
+            print( "  stitching " + str( settings["tile_count"] ) + " images." )
 
-        h_sizes, v_sizes = [0] * settings["col_count"], [0] * settings["row_count"]
-        # get grid size and create empty canvas
-        for i, im in enumerate( images ):
-            print( "   resizing image #" + str( i+1 ), end="     \r" )
-            if ( settings["scaleFactor"] < 1 ):
-                newsize = ( int(im.size[0]*settings["scaleFactor"]), int(im.size[1]*settings["scaleFactor"]) )
-                images[i] = images[i].resize(newsize, Image.ANTIALIAS)
-            h, v = i % settings["col_count"], i // settings["col_count"]
-            h_sizes[h] = max(h_sizes[h], images[i].size[0])
-            v_sizes[v] = max(v_sizes[v], images[i].size[1])
-            
-        h_sizes, v_sizes = np.cumsum([0] + h_sizes), np.cumsum([0] + v_sizes)
-        #print(h_sizes[-1], v_sizes[-1])
-        im_grid = Image.new(images[0].mode, (h_sizes[-1], v_sizes[-1]), color='white')
-        # insert tiles to canvas
-        for i, im in enumerate( images ):
-            print( "   pasting image #" + str( i+1 ), end="     \r" )
-            if ( settings["imageDirection"] == 'v' ): # vertical tile sequence
-                im_grid.paste(im, (h_sizes[i // settings["row_count"]], v_sizes[i % settings["row_count"]]))
-            else: # horizontal tile sequence
-                im_grid.paste(im, (h_sizes[i % settings["col_count"]], v_sizes[i // settings["col_count"]]))
-        if resultFile == '': resultFile = settings["outputDirectory"] + os.sep + result_file_name + settings["fileType"]
+            images = []
+            for x in fileNameList:
+                if x == 'EMPTY': # fails if the first image is empty, which should never happen
+                    images.append(Image.new(scaling_file.mode, (scaling_file.size[0], scaling_file.size[1]), color='black'))
+                else:
+                    images.append(Image.open( x ))
 
-        print( "  saving result to " + resultFile )
-        if settings["cropX"] > 0 and (settings["cropX"] < h_sizes[-1] or settings["cropY"] < v_sizes[-1]):
-            crop_x = settings["cropX"] if settings["cropX"] < h_sizes[-1] else h_sizes[-1]
-            crop_y = settings["cropY"] if settings["cropY"] < v_sizes[-1] else v_sizes[-1]
-            im_grid = im_grid.crop((0,0, crop_x, crop_y))
-        # set scaling for ImageJ
-        if scaling == False or scaling == es.getEmptyScaling(): scaling = { 'x' : settings["scaleX"], 'y' : settings["scaleY"], 'unit' : settings["scaleUnit"], 'editor':'FEI-MAPS'}
-        im_grid.save( resultFile, tiffinfo = ts.setImageJScaling( scaling ) )
+            h_sizes, v_sizes = [0] * settings["col_count"], [0] * settings["row_count"]
+            # get grid size and create empty canvas
+            for i, im in enumerate( images ):
+                print( "   resizing image #" + str( i+1 ), end="     \r" )
+                if ( settings["scaleFactor"] < 1 ):
+                    newsize = ( int(im.size[0]*settings["scaleFactor"]), int(im.size[1]*settings["scaleFactor"]) )
+                    images[i] = images[i].resize(newsize, Image.ANTIALIAS)
+                h, v = i % settings["col_count"], i // settings["col_count"]
+                h_sizes[h] = max(h_sizes[h], images[i].size[0])
+                v_sizes[v] = max(v_sizes[v], images[i].size[1])
 
-        thumbXSize = 2000
-        thumbDirectory = settings["outputDirectory"] + os.sep +'thumbnails'
-        if ( settings["createThumbnail"] and im_grid.size[0] > thumbXSize):
-            if ( not os.path.isdir( thumbDirectory ) ):
-                os.mkdir( thumbDirectory )
-            thumbFile = thumbDirectory + os.sep + result_file_name + settings["fileType"]
-            print( "  saving thumbnail to " + thumbFile )
-            scaleFactor = thumbXSize/im_grid.size[0]
-            newsize = ( thumbXSize, int(scaleFactor*im_grid.size[1]) )
-            im_grid = im_grid.resize(newsize) 
-            scaling = { 'x' : scaling['x']/scaleFactor, 'y' : scaling['y']/scaleFactor , 'unit' : scaling['unit'], 'editor' : scaling['editor']}
-            im_grid.save( thumbFile, tiffinfo = ts.setImageJScaling( scaling ) )
+            h_sizes, v_sizes = np.cumsum([0] + h_sizes), np.cumsum([0] + v_sizes)
+            #print(h_sizes[-1], v_sizes[-1])
+            im_grid = Image.new(images[0].mode, (h_sizes[-1], v_sizes[-1]), color='white')
+            # insert tiles to canvas
+            for i, im in enumerate( images ):
+                print( "   pasting image #" + str( i+1 ), end="     \r" )
+                if ( settings["imageDirection"] == 'v' ): # vertical tile sequence
+                    im_grid.paste(im, (h_sizes[i // settings["row_count"]], v_sizes[i % settings["row_count"]]))
+                else: # horizontal tile sequence
+                    im_grid.paste(im, (h_sizes[i % settings["col_count"]], v_sizes[i // settings["col_count"]]))
+            if resultFile == '': resultFile = settings["outputDirectory"] + os.sep + result_file_name + settings["fileType"]
 
-        im_grid.close()
+            print( "  saving result to " + resultFile )
+            if settings["cropX"] > 0 and (settings["cropX"] < h_sizes[-1] or settings["cropY"] < v_sizes[-1]):
+                crop_x = settings["cropX"] if settings["cropX"] < h_sizes[-1] else h_sizes[-1]
+                crop_y = settings["cropY"] if settings["cropY"] < v_sizes[-1] else v_sizes[-1]
+                im_grid = im_grid.crop((0,0, crop_x, crop_y))
+            # set scaling for ImageJ
+            if scaling == False or scaling == es.getEmptyScaling(): scaling = { 'x' : settings["scaleX"], 'y' : settings["scaleY"], 'unit' : settings["scaleUnit"], 'editor':'FEI-MAPS'}
+            im_grid.save( resultFile, tiffinfo = ts.setImageJScaling( scaling ) )
 
-        if settings["openResultFile"]:
-            if platform.system() == 'Darwin':       # macOS
-                subprocess.call(('open', resultFile))
-            elif platform.system() == 'Windows':    # Windows
-                os.startfile(resultFile)
-            else:                                   # linux variants
-                subprocess.call(('xdg-open', resultFile))
+            thumbXSize = 2000
+            thumbDirectory = settings["outputDirectory"] + os.sep +'thumbnails'
+            if ( settings["createThumbnail"] and im_grid.size[0] > thumbXSize):
+                if ( not os.path.isdir( thumbDirectory ) ):
+                    os.mkdir( thumbDirectory )
+                thumbFile = thumbDirectory + os.sep + result_file_name + settings["fileType"]
+                print( "  saving thumbnail to " + thumbFile )
+                scaleFactor = thumbXSize/im_grid.size[0]
+                newsize = ( thumbXSize, int(scaleFactor*im_grid.size[1]) )
+                im_grid = im_grid.resize(newsize)
+                scaling = { 'x' : scaling['x']/scaleFactor, 'y' : scaling['y']/scaleFactor , 'unit' : scaling['unit'], 'editor' : scaling['editor']}
+                im_grid.save( thumbFile, tiffinfo = ts.setImageJScaling( scaling ) )
+
+            im_grid.close()
+
+            if settings["openResultFile"]:
+                if platform.system() == 'Darwin':       # macOS
+                    subprocess.call(('open', resultFile))
+                elif platform.system() == 'Windows':    # Windows
+                    os.startfile(resultFile)
+                else:                                   # linux variants
+                    subprocess.call(('xdg-open', resultFile))
+        else:
+            print('Error, none of the files found!')
+
 
 def getFileList( settings ):
     allowed_file_extensions = [ '.tif', '.png' ]
@@ -219,8 +229,8 @@ if __name__ == '__main__':
     #remove root windows
     root = tk.Tk()
     root.withdraw()
-  
-    ### global settings    
+
+    ### global settings
     programInfo()
     settings = processArguments()
     if ( settings["workingDirectory"] == "" ):
@@ -229,7 +239,7 @@ if __name__ == '__main__':
     if ( settings["outputDirectory"] == "" ):
         settings["outputDirectory"] = os.path.dirname( settings["workingDirectory"] )
 
-    if ( settings["showDebuggingOutput"] ) : 
+    if ( settings["showDebuggingOutput"] ) :
         print( "I am living in '" + settings["home_dir"] + "'" )
         print( "Selected working directory: " + settings["workingDirectory"] )
         print( "Output directory: " + settings["outputDirectory"], end='\n\n' )
