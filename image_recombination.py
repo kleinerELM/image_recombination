@@ -175,9 +175,8 @@ def stitchImages( settings, fileNameList, resultFile = '', result_file_name = ''
                 crop_y = settings["cropY"] if settings["cropY"] < v_sizes[-1] else v_sizes[-1]
                 im_grid = im_grid.crop((0,0, crop_x, crop_y))
             # set scaling for ImageJ
-            UC = es.unit()
             if scaling == False or scaling == es.getEmptyScaling(): scaling = { 'x' : settings["scaleX"], 'y' : settings["scaleY"], 'unit' : settings["scaleUnit"], 'editor':'FEI-MAPS'}
-            im_grid.save( resultFile, tiffinfo = UC.setImageJScaling( scaling ) )
+            im_grid.save( resultFile, tiffinfo = es.setImageJScaling( scaling ) )
 
             thumbXSize = 2000
             thumbDirectory = settings["outputDirectory"] + os.sep +'thumbnails'
@@ -190,7 +189,7 @@ def stitchImages( settings, fileNameList, resultFile = '', result_file_name = ''
                 newsize = ( thumbXSize, int(scaleFactor*im_grid.size[1]) )
                 im_grid = im_grid.resize(newsize)
                 scaling = { 'x' : scaling['x']/scaleFactor, 'y' : scaling['y']/scaleFactor , 'unit' : scaling['unit'], 'editor' : scaling['editor']}
-                im_grid.save( thumbFile, tiffinfo = UC.setImageJScaling( scaling ) )
+                im_grid.save( thumbFile, tiffinfo = es.setImageJScaling( scaling ) )
 
             im_grid.close()
 
