@@ -12,10 +12,9 @@ import numpy as np
 home_dir = os.path.dirname(os.path.realpath(__file__))
 # import tiff_scaling script
 ts_path = os.path.dirname( home_dir ) + '/tiff_scaling/'
-ts_file = 'set_tiff_scaling'
+ts_file = 'extract_tiff_scaling'
 if ( os.path.isdir( ts_path ) and os.path.isfile( ts_path + ts_file + '.py' ) or os.path.isfile( home_dir + ts_file + '.py' ) ):
     if ( os.path.isdir( ts_path ) ): sys.path.insert( 1, ts_path )
-    import set_tiff_scaling as ts
     import extract_tiff_scaling as es
 else:
     programInfo()
@@ -176,8 +175,9 @@ def stitchImages( settings, fileNameList, resultFile = '', result_file_name = ''
                 crop_y = settings["cropY"] if settings["cropY"] < v_sizes[-1] else v_sizes[-1]
                 im_grid = im_grid.crop((0,0, crop_x, crop_y))
             # set scaling for ImageJ
+            UC = es.unit()
             if scaling == False or scaling == es.getEmptyScaling(): scaling = { 'x' : settings["scaleX"], 'y' : settings["scaleY"], 'unit' : settings["scaleUnit"], 'editor':'FEI-MAPS'}
-            im_grid.save( resultFile, tiffinfo = ts.setImageJScaling( scaling ) )
+            im_grid.save( resultFile, tiffinfo = UC.setImageJScaling( scaling ) )
 
             thumbXSize = 2000
             thumbDirectory = settings["outputDirectory"] + os.sep +'thumbnails'
@@ -190,7 +190,7 @@ def stitchImages( settings, fileNameList, resultFile = '', result_file_name = ''
                 newsize = ( thumbXSize, int(scaleFactor*im_grid.size[1]) )
                 im_grid = im_grid.resize(newsize)
                 scaling = { 'x' : scaling['x']/scaleFactor, 'y' : scaling['y']/scaleFactor , 'unit' : scaling['unit'], 'editor' : scaling['editor']}
-                im_grid.save( thumbFile, tiffinfo = ts.setImageJScaling( scaling ) )
+                im_grid.save( thumbFile, tiffinfo = UC.setImageJScaling( scaling ) )
 
             im_grid.close()
 
