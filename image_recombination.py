@@ -27,7 +27,7 @@ def programInfo():
     print("# Automatically stitch TIFF images using a defined grid #")
     print("# in a selected folder.                                 #")
     print("#                                                       #")
-    print("# © 2021 Florian Kleiner, Max Patzelt                   #")
+    print("# © 2022 Florian Kleiner, Max Patzelt                   #")
     print("#   Bauhaus-Universität Weimar                          #")
     print("#   Finger-Institut für Baustoffkunde                   #")
     print("#                                                       #")
@@ -208,7 +208,7 @@ def getFileList( settings ):
     allowed_file_extensions = [ '.tif', '.png' ]
     if os.path.isdir( settings["workingDirectory"] ) :
         fileNameList = []
-        for file in os.listdir(settings["workingDirectory"]):
+        for file in sorted(os.listdir(settings["workingDirectory"])):
             file_name, file_extension = os.path.splitext( file )
             if ( file_extension.lower() in allowed_file_extensions ):
                 if ( settings["fileType"] == "" ):
